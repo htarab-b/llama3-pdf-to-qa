@@ -13,16 +13,16 @@ def extract_text_from_pdf(pdf_path, pages_per_chunk=5):
         if page_text:
             text.append(page_text)
         
-        # Process chunk when it reaches `pages_per_chunk` or at the end
         if (i + 1) % pages_per_chunk == 0 or (i + 1) == len(reader.pages):
             chunks.append("\n".join(text))
             text = []  # Reset text buffer
             print(f"Extracted chunk {len(chunks)} with {pages_per_chunk} pages.")
 
+    print(chunks)
     return chunks
 
 def structure_text_using_llama(text):
-    """Uses LLaMA 3 to structure raw text into properly formatted sentences."""
+    """Uses LLaMA 3 to restructure raw text into properly formatted sentences."""
     prompt = f"""The following text is extracted from a PDF and needs restructuring.
 
     Text:
@@ -35,13 +35,24 @@ def structure_text_using_llama(text):
     """
 
     response = ollama.chat(model="llama3", messages=[{"role": "user", "content": prompt}])
-    print (response["message"]["content"])
+    print(response["message"]["content"])
+    return response["message"]["content"]
+
+def summarize_text(text):
+    """Summarizes extracted content before generating Q&A."""
+    prompt = f"""Summarize the following text while keeping key technical details:
+    
+    {text}
+    
+    Output only the summarized content."""
+    
+    response = ollama.chat(model="llama3", messages=[{"role": "user", "content": prompt}])
+    print(response["message"]["content"])
     return response["message"]["content"]
 
 def generate_qa_pairs(content):
-    """Generates Q&A pairs using LLaMA 3 for structured content."""
-    qa_pairs = []
-    prompt = f"""Generate all possible questions and answers based on the following text:
+    """Generates all possible Q&A pairs using LLaMA 3 for structured content."""
+    prompt = f"""Generate all possible question-answer pairs based on the following text:
     
     {content}
     
@@ -49,15 +60,16 @@ def generate_qa_pairs(content):
     Q: <Generated Question>
     A: <Generated Answer>
     
-    Output only the Q and A without extra text.
+    Only output the Q and A without extra text.
     """
 
     response = ollama.chat(model="llama3", messages=[{"role": "user", "content": prompt}])
     response_text = response["message"]["content"]
 
     # Parse the response into Q&A pairs
+    qa_pairs = []
     qa_sections = response_text.split("Q:")
-    for section in qa_sections[1:]:  # Skip the first split part as it will be empty
+    for section in qa_sections[1:]:  # Skip the first empty split
         if "A:" in section:
             parts = section.split("A:")
             question = parts[0].strip()
@@ -68,48 +80,27 @@ def generate_qa_pairs(content):
                 "input": "",
                 "output": answer
             })
-
-    print (qa_pairs)
+    print(qa_pairs)
     return qa_pairs
 
-def save_to_jsonl(data, filename="./QA Generator/train.jsonl"):
+def save_to_jsonl(data, filename):
     """Saves the generated Q&A pairs in JSONL format."""
     with open(filename, "w") as f:
         for entry in data:
             f.write(json.dumps(entry) + "\n")
 
-# Load PDF and extract text in chunks
+# Load PDF and extract text
 pdf_path = "./QA Generator/Liebherr-LTM-1130-operators-manual-21-1686.pdf"
-
 chunks = extract_text_from_pdf(pdf_path)
+
+# Process text and generate Q&A pairs
+structured_chunks = [structure_text_using_llama(chunk) for chunk in chunks]
+summarized_chunks = [summarize_text(chunk) for chunk in structured_chunks]
 qa_data = []
-incomplete_sentence = ""
 
-for i, chunk in enumerate(chunks):
-    # If there's an incomplete sentence from the previous chunk, prepend it
-    if incomplete_sentence:
-        chunk = incomplete_sentence + " " + chunk
+for chunk in summarized_chunks:
+    qa_data.extend(generate_qa_pairs(chunk))
 
-    # Get structured sentences from LLaMA 3
-    structured_text = structure_text_using_llama(chunk)
-
-    # Check if the last sentence is incomplete
-    structured_sentences = structured_text.split("\n")
-    last_sentence = structured_sentences[-1].strip()
-    
-    # If it looks incomplete, store it for the next chunk
-    if len(last_sentence) < 20 or not last_sentence.endswith((".", "?", "!")):
-        incomplete_sentence = last_sentence
-        structured_sentences = structured_sentences[:-1]  # Remove the incomplete part
-    else:
-        incomplete_sentence = ""  # Reset if sentence is complete
-
-    final_text = "\n".join(structured_sentences)
-
-    # Generate Q&A pairs from the structured text
-    qa_data.extend(generate_qa_pairs(final_text))
-    print(f"Finished generating Q&A for chunk {i+1}/{len(chunks)}")
-
-# Save the output
-save_to_jsonl(qa_data)
+# Save output
+save_to_jsonl(qa_data, "./QA Generator/train.jsonl")
 print(f"QA pairs saved to train.jsonl with {len(qa_data)} entries.")
