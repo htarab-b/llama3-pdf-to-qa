@@ -1,8 +1,9 @@
 import ollama
 import json
 from PyPDF2 import PdfReader
+import os
 
-def extract_text_from_pdf(pdf_path, pages_per_chunk=5):
+def extract_text_from_pdf(pdf_path, pages_per_chunk=2):
     """Extracts text from a PDF file in chunks of pages."""
     reader = PdfReader(pdf_path)
     chunks = []
@@ -18,6 +19,7 @@ def extract_text_from_pdf(pdf_path, pages_per_chunk=5):
             text = []  # Reset text buffer
             print(f"Extracted chunk {len(chunks)} with {pages_per_chunk} pages.")
 
+    os.system("clear")
     print(chunks)
     return chunks
 
@@ -35,6 +37,7 @@ def structure_text_using_llama(text):
     """
 
     response = ollama.chat(model="llama3", messages=[{"role": "user", "content": prompt}])
+    os.system("clear")
     print(response["message"]["content"])
     return response["message"]["content"]
 
@@ -47,12 +50,13 @@ def summarize_text(text):
     Output only the summarized content."""
     
     response = ollama.chat(model="llama3", messages=[{"role": "user", "content": prompt}])
+    os.system("clear")
     print(response["message"]["content"])
     return response["message"]["content"]
 
 def generate_qa_pairs(content):
     """Generates all possible Q&A pairs using LLaMA 3 for structured content."""
-    prompt = f"""Generate all possible question-answer pairs based on the following text:
+    prompt = f"""Generate all possible question-answer pairs based on the following text. Try to generate the maximum number of questions and answers by covering the same content through different angles.:
     
     {content}
     
@@ -80,6 +84,7 @@ def generate_qa_pairs(content):
                 "input": "",
                 "output": answer
             })
+    os.system("clear")
     print(qa_pairs)
     return qa_pairs
 
