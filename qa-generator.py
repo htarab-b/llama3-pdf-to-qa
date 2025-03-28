@@ -80,9 +80,8 @@ def generate_qa_pairs(content):
             answer = parts[1].strip()
 
             qa_pairs.append({
-                "instruction": question,
-                "input": "",
-                "output": answer
+                "prompt": question,
+                "response": answer
             })
     os.system("clear")
     print(qa_pairs)
