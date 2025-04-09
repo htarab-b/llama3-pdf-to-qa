@@ -56,7 +56,7 @@ def summarize_text(text):
 
 def generate_qa_pairs(content):
     """Generates all possible Q&A pairs using LLaMA 3 for structured content."""
-    prompt = f"""Generate all possible question-answer pairs based on the following text. Try to generate the maximum number of questions and answers by covering the same content through different angles.:
+    prompt = f"""Generate all possible detailed question-answer pairs based on the following text:
     
     {content}
     
@@ -80,8 +80,9 @@ def generate_qa_pairs(content):
             answer = parts[1].strip()
 
             qa_pairs.append({
-                "prompt": question,
-                "response": answer
+                "instruction": question,
+                "input": "",
+                "output": answer
             })
     os.system("clear")
     print(qa_pairs)
